@@ -1,0 +1,19 @@
+/* Design tokens. The agent rewrites THIS file to rebrand a site.
+   Every component uses these token names (bg-brand, text-ink, rounded-card ...). */
+@theme {
+  --color-brand: #2563eb;
+  --color-brand-ink: #ffffff;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f4f6fa;
+  --color-ink: #0f172a;
+  --color-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-danger: #dc2626;
+  --color-ok: #16a34a;
+
+  --font-display: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+  --font-body: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+
+  --radius-card: 1rem;
+  --radius-control: 0.625rem;
+}

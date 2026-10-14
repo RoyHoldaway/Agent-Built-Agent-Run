@@ -1,0 +1,14 @@
+---
+import config from '../../site.config.json';
+const b = config.business;
+---
+<footer class="border-t border-line bg-surface-alt">
+  <div class="mx-auto flex max-w-6xl flex-col gap-2 px-4 py-8 text-sm text-muted sm:flex-row sm:justify-between">
+    <p>&copy; {new Date().getFullYear()} {b.name}</p>
+    <p class="flex flex-wrap gap-x-4">
+      {b.phone && <a href={`tel:${b.phone}`} class="hover:text-ink">{b.phone}</a>}
+      {b.email && <a href={`mailto:${b.email}`} class="hover:text-ink">{b.email}</a>}
+      {b.address && <span>{b.address}</span>}
+    </p>
+  </div>
+</footer>

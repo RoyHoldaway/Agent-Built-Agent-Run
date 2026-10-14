@@ -1,0 +1,240 @@
+---
+import Base from '../../layouts/Base.astro';
+export const prerender = true;
+---
+<Base title="Admin" noindex>
+  <div id="admin" class="mx-auto max-w-4xl px-4 py-10">
+    <!-- login -->
+    <form id="login" class="mx-auto max-w-sm space-y-4 rounded-card border border-line p-6" hidden>
+      <h1 class="text-xl font-bold">Admin login</h1>
+      <label class="block text-sm">Password
+        <input name="password" type="password" required autocomplete="current-password" class="mt-1 w-full rounded-control border border-line px-3 py-2.5" />
+      </label>
+      <p id="login-error" class="text-sm text-danger" role="alert"></p>
+      <button class="w-full rounded-control bg-brand px-4 py-2.5 font-semibold text-brand-ink">Sign in</button>
+    </form>
+
+    <!-- dashboard -->
+    <div id="dash" hidden>
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold">Admin</h1>
+        <button id="logout" class="rounded-control border border-line px-3 py-1.5 text-sm hover:bg-surface-alt">Sign out</button>
+      </div>
+      <p id="toast" class="mt-3 min-h-6 text-sm" role="status"></p>
+
+      <div role="tablist" class="mt-2 flex flex-wrap gap-1 border-b border-line">
+        <button role="tab" data-tab="bookings" class="tab">Bookings</button>
+        <button role="tab" data-tab="daysoff" class="tab">Days off</button>
+        <button role="tab" data-tab="hours" class="tab">Weekly hours</button>
+        <button role="tab" data-tab="services" class="tab">Services</button>
+        <button role="tab" data-tab="settings" class="tab">Settings</button>
+      </div>
+
+      <section data-panel="bookings" class="pt-6">
+        <div id="bookings-list" class="space-y-2"></div>
+      </section>
+
+      <section data-panel="daysoff" class="pt-6" hidden>
+        <p class="text-sm text-muted">Close a single day or a whole range (vacations, holidays). Customers can't book closed days. Existing bookings are kept, so check the Bookings tab.</p>
+        <form id="daysoff-form" class="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_2fr_auto] sm:items-end">
+          <label class="text-sm">From <input type="date" name="from" required class="field" /></label>
+          <label class="text-sm">To (optional) <input type="date" name="to" class="field" /></label>
+          <label class="text-sm">Reason (private) <input name="reason" maxlength="200" class="field" /></label>
+          <button class="rounded-control bg-brand px-4 py-2.5 font-semibold text-brand-ink">Close days</button>
+        </form>
+        <ul id="daysoff-list" class="mt-6 divide-y divide-line rounded-card border border-line"></ul>
+      </section>
+
+      <section data-panel="hours" class="pt-6" hidden>
+        <form id="hours-form" class="space-y-2"></form>
+      </section>
+
+      <section data-panel="services" class="pt-6" hidden>
+        <div id="services-list" class="space-y-3"></div>
+        <button id="service-add" class="mt-4 rounded-control border border-line px-4 py-2 text-sm hover:bg-surface-alt">+ Add service</button>
+      </section>
+
+      <section data-panel="settings" class="pt-6" hidden>
+        <form id="settings-form" class="grid max-w-md gap-4"></form>
+      </section>
+    </div>
+  </div>
+</Base>
+
+<style is:global>
+  #admin .tab { padding: .6rem 1rem; font-size: .875rem; color: var(--color-muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+  #admin .tab[aria-selected="true"] { color: var(--color-ink); border-color: var(--color-brand); font-weight: 600; }
+  #admin .field { display: block; margin-top: .25rem; width: 100%; border: 1px solid var(--color-line); border-radius: var(--radius-control); padding: .6rem .75rem; background: var(--color-surface); }
+</style>
+
+<script>
+  const $ = <T extends HTMLElement = HTMLElement>(s: string) => document.querySelector(s) as T;
+  const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const h = (tag: string, cls = '', text = '') => { const e = document.createElement(tag); e.className = cls; e.textContent = text; return e; };
+
+  async function api(path: string, method = 'GET', body?: unknown) {
+    const r = await fetch(path, {
+      method, headers: body ? { 'content-type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await r.json().catch(() => ({}));
+    if (r.status === 401 && path !== '/api/admin/login') { showLogin(); throw new Error('Signed out'); }
+    if (!r.ok) throw new Error(data.error || 'Request failed');
+    return data;
+  }
+  function toast(msg: string, bad = false) {
+    const t = $('#toast'); t.textContent = msg; t.className = 'mt-3 min-h-6 text-sm ' + (bad ? 'text-danger' : 'text-ok');
+  }
+  const run = async (fn: () => Promise<unknown>) => { try { await fn(); } catch (e) { toast((e as Error).message, true); } };
+
+  function showLogin() { $('#dash').hidden = true; $('#login').hidden = false; }
+  async function showDash() { $('#login').hidden = true; $('#dash').hidden = false; selectTab('bookings'); }
+
+  // ---------- tabs ----------
+  const loaders: Record<string, () => Promise<void>> = {};
+  function selectTab(name: string) {
+    document.querySelectorAll<HTMLElement>('[data-tab]').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === name)));
+    document.querySelectorAll<HTMLElement>('[data-panel]').forEach((p) => (p.hidden = p.dataset.panel !== name));
+    toast('');
+    run(loaders[name]);
+  }
+  document.querySelectorAll<HTMLElement>('[data-tab]').forEach((t) => t.addEventListener('click', () => selectTab(t.dataset.tab!)));
+
+  // ---------- bookings ----------
+  loaders.bookings = async () => {
+    const { bookings } = await api('/api/admin/bookings');
+    const box = $('#bookings-list'); box.replaceChildren();
+    if (!bookings.length) box.append(h('p', 'text-muted text-sm', 'No upcoming bookings.'));
+    for (const b of bookings) {
+      const row = h('div', 'flex flex-wrap items-start justify-between gap-3 rounded-card border border-line p-4' + (b.status === 'cancelled' ? ' opacity-50' : ''));
+      const info = h('div');
+      info.append(h('p', 'font-semibold', `${b.date} · ${b.start}–${b.end} · ${b.service}`));
+      info.append(h('p', 'text-sm', `${b.name} · ${b.email}${b.phone ? ' · ' + b.phone : ''}`));
+      if (b.notes) info.append(h('p', 'text-sm text-muted', b.notes));
+      const btn = h('button', 'rounded-control border border-line px-3 py-1.5 text-sm hover:bg-surface-alt', b.status === 'cancelled' ? 'Restore' : 'Cancel');
+      btn.addEventListener('click', () => run(async () => {
+        if (b.status !== 'cancelled' && !confirm(`Cancel ${b.name}'s booking?`)) return;
+        await api('/api/admin/bookings', 'PATCH', { id: b.id, status: b.status === 'cancelled' ? 'confirmed' : 'cancelled' });
+        await loaders.bookings();
+      }));
+      row.append(info, btn); box.append(row);
+    }
+  };
+
+  // ---------- days off ----------
+  loaders.daysoff = async () => {
+    const { daysOff } = await api('/api/admin/days-off');
+    const ul = $('#daysoff-list'); ul.replaceChildren();
+    if (!daysOff.length) ul.append(h('li', 'p-4 text-sm text-muted', 'No days off scheduled.'));
+    for (const d of daysOff) {
+      const li = h('li', 'flex items-center justify-between gap-3 p-3 text-sm');
+      li.append(h('span', '', `${d.date}${d.reason ? ' · ' + d.reason : ''}`));
+      const b = h('button', 'rounded-control border border-line px-3 py-1 hover:bg-surface-alt', 'Reopen');
+      b.addEventListener('click', () => run(async () => {
+        await api('/api/admin/days-off?date=' + d.date, 'DELETE'); await loaders.daysoff(); toast('Day reopened.');
+      }));
+      li.append(b); ul.append(li);
+    }
+  };
+  $('#daysoff-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target as HTMLFormElement);
+    run(async () => {
+      const out = await api('/api/admin/days-off', 'POST', { from: fd.get('from'), to: fd.get('to') || fd.get('from'), reason: fd.get('reason') });
+      (e.target as HTMLFormElement).reset();
+      await loaders.daysoff();
+      toast(`Closed ${out.closed} day(s).` + (out.affectedBookings ? ` Heads up: ${out.affectedBookings} existing booking(s) fall in that range. Check the Bookings tab.` : ''), !!out.affectedBookings);
+    });
+  });
+
+  // ---------- weekly hours ----------
+  loaders.hours = async () => {
+    const { hours } = await api('/api/admin/hours');
+    const f = $('#hours-form'); f.replaceChildren();
+    for (const d of hours) {
+      const row = h('div', 'grid grid-cols-[7rem_auto_1fr_1fr] items-center gap-3 text-sm');
+      row.dataset.weekday = d.weekday;
+      row.append(h('span', 'font-semibold', DAYS[d.weekday]));
+      const lab = h('label', 'flex items-center gap-1.5'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!d.closed; cb.name = 'closed';
+      lab.append(cb, document.createTextNode('Closed'));
+      const o = document.createElement('input'); o.type = 'time'; o.value = d.open; o.name = 'open'; o.className = 'field !mt-0';
+      const c = document.createElement('input'); c.type = 'time'; c.value = d.close; c.name = 'close'; c.className = 'field !mt-0';
+      const sync = () => { o.disabled = c.disabled = cb.checked; }; cb.addEventListener('change', sync); sync();
+      row.append(lab, o, c); f.append(row);
+    }
+    const save = h('button', 'mt-4 rounded-control bg-brand px-5 py-2.5 font-semibold text-brand-ink', 'Save hours'); save.type = 'submit'; f.append(save);
+  };
+  $('#hours-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const hours = [...document.querySelectorAll<HTMLElement>('#hours-form [data-weekday]')].map((row) => ({
+      weekday: Number(row.dataset.weekday),
+      closed: (row.querySelector('[name=closed]') as HTMLInputElement).checked,
+      open: (row.querySelector('[name=open]') as HTMLInputElement).value,
+      close: (row.querySelector('[name=close]') as HTMLInputElement).value,
+    }));
+    run(async () => { await api('/api/admin/hours', 'PUT', { hours }); toast('Hours saved.'); });
+  });
+
+  // ---------- services ----------
+  function serviceRow(s: any) {
+    const f = h('form', 'grid gap-3 rounded-card border border-line p-4 sm:grid-cols-[2fr_1fr_1fr_auto_auto] sm:items-end');
+    const mk = (label: string, name: string, type: string, val: string | number, extra = '') => {
+      const l = h('label', 'text-sm', label); const i = document.createElement('input');
+      i.name = name; i.type = type; i.value = String(val); i.className = 'field'; if (extra) i.setAttribute('min', extra); i.required = true; l.append(i); return l;
+    };
+    const active = h('label', 'flex items-center gap-1.5 text-sm'); const cb = document.createElement('input'); cb.type = 'checkbox'; cb.name = 'active'; cb.checked = s.active !== 0;
+    active.append(cb, document.createTextNode('Bookable'));
+    const save = h('button', 'rounded-control bg-brand px-4 py-2.5 font-semibold text-brand-ink', 'Save');
+    f.append(mk('Name', 'name', 'text', s.name), mk('Minutes', 'durationMin', 'number', s.durationMin, '5'), mk('Price ($)', 'price', 'number', s.price, '0'), active, save);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault(); const fd = new FormData(f);
+      run(async () => {
+        await api('/api/admin/services', 'POST', { id: s.id, name: fd.get('name'), durationMin: fd.get('durationMin'), price: fd.get('price'), active: cb.checked });
+        toast('Service saved.'); await loaders.services();
+      });
+    });
+    return f;
+  }
+  loaders.services = async () => {
+    const { services } = await api('/api/admin/services');
+    const box = $('#services-list'); box.replaceChildren(...services.map(serviceRow));
+  };
+  $('#service-add').addEventListener('click', () => {
+    const f = serviceRow({ name: '', durationMin: 30, price: 0, active: 1 }); $('#services-list').append(f);
+    (f.querySelector('input') as HTMLInputElement).focus();
+  });
+
+  // ---------- settings ----------
+  const SETTING_FIELDS: [string, string, string][] = [
+    ['slotStepMin', 'Time between start times (minutes)', 'How often a new appointment can start, e.g. 30'],
+    ['capacity', 'Appointments at the same time', '1 = one customer at a time'],
+    ['minNoticeHours', 'Minimum notice (hours)', 'Blocks last-minute bookings'],
+    ['maxDaysAhead', 'How far ahead people can book (days)', ''],
+  ];
+  loaders.settings = async () => {
+    const { settings } = await api('/api/admin/settings');
+    const f = $('#settings-form'); f.replaceChildren();
+    for (const [key, label, hint] of SETTING_FIELDS) {
+      const l = h('label', 'text-sm', label); const i = document.createElement('input');
+      i.type = 'number'; i.name = key; i.value = settings[key]; i.className = 'field'; i.required = true; l.append(i);
+      if (hint) l.append(h('span', 'mt-1 block text-xs text-muted', hint));
+      f.append(l);
+    }
+    const b = h('button', 'rounded-control bg-brand px-5 py-2.5 font-semibold text-brand-ink justify-self-start', 'Save settings'); b.type = 'submit'; f.append(b);
+  };
+  $('#settings-form').addEventListener('submit', (e) => {
+    e.preventDefault(); const fd = new FormData(e.target as HTMLFormElement);
+    run(async () => { await api('/api/admin/settings', 'PUT', Object.fromEntries(fd)); toast('Settings saved.'); });
+  });
+
+  // ---------- auth ----------
+  $('#login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target as HTMLFormElement);
+    try { await api('/api/admin/login', 'POST', { password: fd.get('password') }); (e.target as HTMLFormElement).reset(); $('#login-error').textContent = ''; showDash(); }
+    catch (err) { $('#login-error').textContent = (err as Error).message; }
+  });
+  $('#logout').addEventListener('click', async () => { await fetch('/api/admin/session', { method: 'DELETE' }); showLogin(); });
+
+  fetch('/api/admin/session').then((r) => (r.ok ? showDash() : showLogin()));
+</script>

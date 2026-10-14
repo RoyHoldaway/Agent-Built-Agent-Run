@@ -1,0 +1,85 @@
+﻿# API keys and environment variables
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Allow safe example templates
+!.env.example
+!**/.env.example
+
+# Python environments and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+
+# Secrets and private credentials
+*.pem
+*.key
+credentials.json
+secrets.json
+service-account*.json
+
+# Local databases and logs
+*.db
+*.sqlite3
+*.log
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Private data and generated results
+*token*.json
+*credentials*
+*contact*.xlsx
+*lead*.xlsx
+*lead*.json
+*results*.xlsx
+*results*.json
+*leads*.txt
+
+# Build outputs and dependencies
+**/node_modules/
+**/dist/
+**/.astro/
+**/.siteagent/
+**/*.egg-info/
+**/*.bak
+
+# Separate project repository
+siteagent/clients/bella-salon/
+
+# Personal resumes
+*Resume*.pdf
+*resume*.pdf
+
+# Locally bundled dependencies
+local_lead_pipeline/local_packages/
+
+# Private business data and generated lead results
+local_lead_pipeline/data/
+local_lead_pipeline/output/
+local_lead_pipeline/state/
+local_lead_pipeline/lead_guillotine_state/
+old agents/processing leads/
+old agents/processing leads txt files/
+jobhunt/jobhunt_results.xlsx
+
+# Local state and OAuth credentials
+**/gmail_token.json
+**/filter_state.json
+
+# Local configuration
+jobhunt/jobhunt_config.json
+
+# Python virtual environments
+**/.venv/
+**/venv/
+
+# Private sales notes
+old agents/knowledge/

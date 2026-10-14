@@ -1,0 +1,10 @@
+---
+import Base from '../layouts/Base.astro';
+import Hero from '../components/sections/Hero.astro';
+import config from '../../site.config.json';
+
+export const prerender = true;
+---
+<Base>
+  <Hero heading={config.business.name} sub={config.business.tagline} />
+</Base>

@@ -1,0 +1,12 @@
+---
+// Example section. The agent writes new sections next to this file and composes them in pages.
+interface Props { heading: string; sub?: string; ctaLabel?: string; ctaHref?: string }
+const { heading, sub, ctaLabel = 'Book now', ctaHref = '/book' } = Astro.props;
+---
+<section class="bg-surface-alt">
+  <div class="mx-auto max-w-6xl px-4 py-20 sm:py-28">
+    <h1 class="max-w-2xl text-4xl font-bold sm:text-6xl">{heading}</h1>
+    {sub && <p class="mt-5 max-w-xl text-lg text-muted">{sub}</p>}
+    <a href={ctaHref} class="mt-8 inline-block rounded-control bg-brand px-6 py-3 font-semibold text-brand-ink hover:opacity-90">{ctaLabel}</a>
+  </div>
+</section>

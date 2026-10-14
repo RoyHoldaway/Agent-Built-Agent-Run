@@ -1,0 +1,32 @@
+{
+  "business": {
+    "name": "Your Business",
+    "tagline": "A short line about what you do.",
+    "phone": "",
+    "email": "",
+    "address": "",
+    "timezone": "America/Denver"
+  },
+  "nav": [
+    { "label": "Home", "href": "/" },
+    { "label": "Book", "href": "/book" }
+  ],
+  "services": [
+    { "name": "Consultation", "durationMin": 30, "price": 0 }
+  ],
+  "booking": {
+    "slotStepMin": 30,
+    "capacity": 1,
+    "minNoticeHours": 2,
+    "maxDaysAhead": 60
+  },
+  "hours": {
+    "mon": ["09:00", "17:00"],
+    "tue": ["09:00", "17:00"],
+    "wed": ["09:00", "17:00"],
+    "thu": ["09:00", "17:00"],
+    "fri": ["09:00", "17:00"],
+    "sat": null,
+    "sun": null
+  }
+}

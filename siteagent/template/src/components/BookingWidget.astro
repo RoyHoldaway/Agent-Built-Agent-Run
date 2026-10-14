@@ -1,0 +1,202 @@
+---
+// Self-contained booking flow: service -> day -> time -> details -> confirmation.
+// Styled only with theme tokens, so rebranding via theme.css restyles it. Do not rewrite the logic.
+---
+<div id="booking" class="rounded-card border border-line bg-surface p-5 shadow-sm sm:p-8" data-state="loading">
+  <p data-role="status" class="text-muted" role="status">Loading…</p>
+
+  <div data-role="flow" hidden class="space-y-8">
+    <div>
+      <label for="bk-service" class="mb-2 block text-sm font-semibold">1. Service</label>
+      <select id="bk-service" class="w-full rounded-control border border-line bg-surface px-3 py-2.5"></select>
+    </div>
+
+    <div>
+      <div class="mb-2 flex items-center justify-between">
+        <span class="text-sm font-semibold">2. Day</span>
+        <div class="flex items-center gap-1">
+          <button type="button" data-role="prev" class="rounded-control px-3 py-1 hover:bg-surface-alt disabled:opacity-30" aria-label="Previous month">‹</button>
+          <span data-role="month" class="min-w-32 text-center text-sm font-semibold" aria-live="polite"></span>
+          <button type="button" data-role="next" class="rounded-control px-3 py-1 hover:bg-surface-alt disabled:opacity-30" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div class="grid grid-cols-7 gap-1 text-center text-xs text-muted" aria-hidden="true">
+        <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
+      </div>
+      <div data-role="grid" class="mt-1 grid grid-cols-7 gap-1"></div>
+    </div>
+
+    <div data-role="times-wrap" hidden>
+      <span class="mb-2 block text-sm font-semibold">3. Time</span>
+      <div data-role="times" class="flex flex-wrap gap-2"></div>
+    </div>
+
+    <form data-role="form" hidden class="space-y-4" novalidate>
+      <span class="block text-sm font-semibold">4. Your details</span>
+      <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" class="hidden" />
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="block text-sm">Name
+          <input name="name" required maxlength="100" autocomplete="name" class="mt-1 w-full rounded-control border border-line px-3 py-2.5" />
+        </label>
+        <label class="block text-sm">Email
+          <input name="email" type="email" required maxlength="200" autocomplete="email" class="mt-1 w-full rounded-control border border-line px-3 py-2.5" />
+        </label>
+      </div>
+      <label class="block text-sm">Phone (optional)
+        <input name="phone" type="tel" maxlength="40" autocomplete="tel" class="mt-1 w-full rounded-control border border-line px-3 py-2.5" />
+      </label>
+      <label class="block text-sm">Notes (optional)
+        <textarea name="notes" rows="3" maxlength="1000" class="mt-1 w-full rounded-control border border-line px-3 py-2.5"></textarea>
+      </label>
+      <p data-role="summary" class="text-sm text-muted"></p>
+      <p data-role="error" class="text-sm text-danger" role="alert"></p>
+      <button type="submit" class="rounded-control bg-brand px-6 py-3 font-semibold text-brand-ink hover:opacity-90 disabled:opacity-50">Confirm booking</button>
+    </form>
+
+    <div data-role="done" hidden class="rounded-control border border-ok/40 bg-ok/10 p-5" role="status">
+      <p class="font-semibold text-ok">You're booked!</p>
+      <p data-role="done-text" class="mt-1 text-sm"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+  const root = document.getElementById('booking') as HTMLElement;
+  const $ = (r: string) => root.querySelector(`[data-role="${r}"]`) as HTMLElement;
+  const el = <T extends HTMLElement>(tag: string, cls = '', text = '') => {
+    const e = document.createElement(tag) as T; e.className = cls; e.textContent = text; return e;
+  };
+
+  type Svc = { id: number; name: string; durationMin: number; price: number };
+  let services: Svc[] = [];
+  let maxDays = 60;
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const today = new Date();
+  let view = { y: today.getFullYear(), m: today.getMonth() }; // m: 0-11
+  let date = '', time = '';
+  let open: Record<string, boolean> = {};
+
+  const select = document.getElementById('bk-service') as HTMLSelectElement;
+  const serviceId = () => Number(select.value);
+  const fmtTime = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    return `${((h + 11) % 12) + 1}:${pad(m)} ${h < 12 ? 'AM' : 'PM'}`;
+  };
+  const fmtDate = (d: string) =>
+    new Date(d + 'T12:00:00').toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+
+  async function api(path: string, init?: RequestInit) {
+    const r = await fetch(path, init);
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(data.error || 'Something went wrong');
+    return data;
+  }
+
+  async function renderCalendar() {
+    const month = `${view.y}-${pad(view.m + 1)}`;
+    $('month').textContent = new Date(view.y, view.m, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+    ($('prev') as HTMLButtonElement).disabled = view.y === today.getFullYear() && view.m <= today.getMonth();
+    const last = new Date(today.getTime() + maxDays * 86400000);
+    ($('next') as HTMLButtonElement).disabled = view.y > last.getFullYear() || (view.y === last.getFullYear() && view.m >= last.getMonth());
+    const grid = $('grid');
+    grid.replaceChildren();
+    try {
+      open = (await api(`/api/calendar?month=${month}&service=${serviceId()}`)).days;
+    } catch { open = {}; }
+    const first = new Date(view.y, view.m, 1).getDay();
+    const count = new Date(view.y, view.m + 1, 0).getDate();
+    for (let i = 0; i < first; i++) grid.append(el('span'));
+    for (let d = 1; d <= count; d++) {
+      const iso = `${month}-${pad(d)}`;
+      const b = el<HTMLButtonElement>('button', 'rounded-control py-2.5 text-sm ' +
+        (open[iso] ? 'hover:bg-surface-alt font-semibold' : 'text-muted/40 line-through cursor-not-allowed'), String(d));
+      b.type = 'button';
+      b.disabled = !open[iso];
+      if (iso === date) b.className += ' !bg-brand !text-brand-ink';
+      b.setAttribute('aria-label', fmtDate(iso) + (open[iso] ? '' : ' (unavailable)'));
+      b.addEventListener('click', () => pickDate(iso));
+      grid.append(b);
+    }
+  }
+
+  async function pickDate(iso: string) {
+    date = iso; time = '';
+    $('form').hidden = true;
+    renderCalendar();
+    const wrap = $('times-wrap'), box = $('times');
+    wrap.hidden = false;
+    box.replaceChildren(el('span', 'text-muted text-sm', 'Loading times…'));
+    try {
+      const { slots } = await api(`/api/availability?date=${iso}&service=${serviceId()}`);
+      box.replaceChildren();
+      if (!slots.length) box.append(el('span', 'text-muted text-sm', 'No times left that day.'));
+      for (const s of slots as string[]) {
+        const b = el<HTMLButtonElement>('button', 'rounded-control border border-line px-4 py-2 text-sm hover:border-brand', fmtTime(s));
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          time = s;
+          box.querySelectorAll('button').forEach((x) => x.classList.remove('!bg-brand', '!text-brand-ink', '!border-brand'));
+          b.classList.add('!bg-brand', '!text-brand-ink', '!border-brand');
+          const svc = services.find((x) => x.id === serviceId())!;
+          $('summary').textContent = `${svc.name} · ${fmtDate(date)} at ${fmtTime(time)}`;
+          $('error').textContent = '';
+          $('form').hidden = false;
+        });
+        box.append(b);
+      }
+    } catch (e) {
+      box.replaceChildren(el('span', 'text-danger text-sm', (e as Error).message));
+    }
+  }
+
+  function resetSelection() {
+    date = ''; time = '';
+    $('times-wrap').hidden = true; $('form').hidden = true;
+  }
+
+  async function init() {
+    try {
+      const data = await api('/api/services');
+      services = data.services; maxDays = data.maxDaysAhead;
+      if (!services.length) { $('status').textContent = 'Online booking is not available right now.'; return; }
+      for (const s of services) {
+        const price = s.price ? ` · $${s.price}` : '';
+        select.append(new Option(`${s.name} (${s.durationMin} min${price})`, String(s.id)));
+      }
+      $('status').hidden = true; $('flow').hidden = false;
+      await renderCalendar();
+    } catch {
+      $('status').textContent = 'Could not load booking. Please refresh or call us.';
+    }
+  }
+
+  select.addEventListener('change', () => { resetSelection(); renderCalendar(); });
+  $('prev').addEventListener('click', () => { view = view.m === 0 ? { y: view.y - 1, m: 11 } : { y: view.y, m: view.m - 1 }; renderCalendar(); });
+  $('next').addEventListener('click', () => { view = view.m === 11 ? { y: view.y + 1, m: 0 } : { y: view.y, m: view.m + 1 }; renderCalendar(); });
+
+  const form = $('form') as HTMLFormElement;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const btn = form.querySelector('button[type=submit]') as HTMLButtonElement;
+    btn.disabled = true; $('error').textContent = '';
+    try {
+      const out = await api('/api/book', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          serviceId: serviceId(), date, time,
+          name: fd.get('name'), email: fd.get('email'), phone: fd.get('phone'), notes: fd.get('notes'), website: fd.get('website'),
+        }),
+      });
+      form.hidden = true; $('times-wrap').hidden = true;
+      $('done-text').textContent = `${out.service} on ${fmtDate(out.date)} at ${fmtTime(out.start)}.`;
+      $('done').hidden = false;
+      renderCalendar();
+    } catch (err) {
+      $('error').textContent = (err as Error).message;
+      if (date) pickDate(date); // refresh times if the slot was taken
+    } finally { btn.disabled = false; }
+  });
+
+  init();
+</script>

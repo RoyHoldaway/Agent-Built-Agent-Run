@@ -1,0 +1,18 @@
+{
+  "discovery": {
+    "provider": "google_places_new",
+    "max_results_per_query": 20,
+    "request_delay_seconds": 0.15,
+    "skip_without_website": false
+  },
+  "website": {
+    "timeout_seconds": 12,
+    "max_pages": 5,
+    "max_body_chars": 12000,
+    "user_agent": "LocalLeadDiscoveryAgent/1.0"
+  },
+  "scoring": {
+    "min_score_for_review": 65,
+    "high_priority_score": 80
+  }
+}

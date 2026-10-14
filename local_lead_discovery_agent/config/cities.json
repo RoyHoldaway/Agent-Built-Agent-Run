@@ -1,0 +1,14 @@
+[
+  {"city":"Estes Park","state":"CO","priority":1},
+  {"city":"Fort Collins","state":"CO","priority":1},
+  {"city":"Loveland","state":"CO","priority":1},
+  {"city":"Greeley","state":"CO","priority":1},
+  {"city":"Windsor","state":"CO","priority":1},
+  {"city":"Longmont","state":"CO","priority":1},
+  {"city":"Berthoud","state":"CO","priority":2},
+  {"city":"Johnstown","state":"CO","priority":2},
+  {"city":"Wellington","state":"CO","priority":2},
+  {"city":"Evans","state":"CO","priority":2},
+  {"city":"Cheyenne","state":"WY","priority":1},
+  {"city":"Yuma","state":"CO","priority":2}
+]

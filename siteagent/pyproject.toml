@@ -1,0 +1,20 @@
+[project]
+name = "siteagent"
+version = "0.1.0"
+description = "Local Qwen-powered agent that turns client briefs and hand-drawn sketches into Astro sites with booking + admin."
+requires-python = ">=3.10"
+dependencies = ["httpx>=0.27", "pillow>=10"]
+
+[project.optional-dependencies]
+review = ["playwright>=1.45"]   # screenshot-vs-sketch review loop
+dev = ["pytest"]
+
+[project.scripts]
+siteagent = "siteagent.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["siteagent"]
